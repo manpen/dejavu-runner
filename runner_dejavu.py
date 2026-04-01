@@ -7,10 +7,27 @@ import signal
 import resource
 import subprocess
 import threading
+import tempfile
+from dejavu_parser import load_dejavu_log
+import hashlib
 
 import argparse
 from argparse import ArgumentParser
 from pathlib import Path
+
+
+def digest_file(path: Path) -> str:
+    BUF_SIZE = int(2**20)
+    digest = hashlib.sha1()
+
+    with open(path, "rb") as f:
+        while True:
+            data = f.read(BUF_SIZE)
+            if not data:
+                break
+            digest.update(data)
+
+    return digest.hexdigest()
 
 
 def set_pdeathsig() -> None:
@@ -74,6 +91,7 @@ def monitor_memory_usage_and_kill(
         if rss > max_rss:
             proc.kill()
             result["memed_out"] = True
+            print("#mem out")
             return
         stop_event.wait(0.25)
 
@@ -88,14 +106,15 @@ def main(
     capture_stdout=False,
     capture_stderr=True,
 ) -> None:
-    logout_path = output_base_path.parent / (output_base_path.name + ".log")
-    stdout_path = output_base_path.parent / (output_base_path.name + ".stdout")
-    stderr_path = output_base_path.parent / (output_base_path.name + ".stderr")
+    logout_path = output_base_path
+    stdout_path = output_base_path.with_suffix(".stdout")
+    stderr_path = output_base_path.with_suffix(".stderr")
 
     result = {
         "args": {
-            "dejavu_path": str(dejavu_path),
-            "dejavu_args": str(dejavu_args),
+            "dejavu_path": str(dejavu_path.resolve()),
+            "dejavu_sha1": digest_file(dejavu_path),
+            "dejavu_args": dejavu_args,
             "instance_path": str(instance_path),
             "timeout_sec": timeout,
             "memory_out_gb": memory_out_gb,
@@ -158,10 +177,19 @@ def main(
         "maxrss": usage.ru_maxrss * 1024,
     }
 
+    try:
+        stderr_file.close()
+    except Exception:
+        pass
+
+    try:
+        result["exec"] = load_dejavu_log(stderr_path)
+    except Exception:
+        pass
+
+    print(f"#log at {logout_path}")
     with open(logout_path, "w") as logout:
         json.dump(result, logout)
-
-    # no need to close files: we exit anyhow ...
 
     # Exit with the child's code when possible, else 1
     sys.exit(proc.returncode if proc.returncode >= 0 else 1)
@@ -177,7 +205,6 @@ if __name__ == "__main__":
         required=True,
         help="Input instance relative to input base",
     )
-    p.add_argument("-I", "--input-base", type=Path, required=True, help="Input base")
     p.add_argument("-d", "--dejavu", type=Path, required=True, help="Dejavu solver")
     p.add_argument("-o", "--output", type=Path, required=True, help="Output directory")
     p.add_argument("-t", "--timeout", type=float, default=120, help="Timeout in sec")
@@ -186,20 +213,23 @@ if __name__ == "__main__":
 
     args = p.parse_args()
 
-    assert args.input_base.is_dir()
     assert args.dejavu.is_file()
 
-    input_path = args.input_base / args.input
+    input_path = args.input
     assert input_path.is_file(), f"{input_path} is not a file"
-
-    output_base_path = args.output / args.input
-    output_base_path.parent.mkdir(parents=True, exist_ok=True)
+    input_path = input_path.resolve()
 
     child_args = (
         args.child_args[1:]
         if args.child_args and args.child_args[0] == "--"
         else args.child_args
     )
+
+    with tempfile.NamedTemporaryFile(
+        delete=False, prefix="job_", suffix=".json", dir=args.output
+    ) as d:
+        output_base_path = Path(d.name)
+        d.close()
 
     main(
         dejavu_path=args.dejavu,
