@@ -139,6 +139,10 @@ def main(
     cmd = [str(dejavu_path)] + dejavu_args + [str(instance_path)]
     print("Executing cmd:", " ".join(cmd))
 
+    if capture_stderr:
+        stderr_file.write(f"c {' '.join([str(c) for c in cmd])}\n")
+        stderr_file.flush()
+
     proc = subprocess.Popen(
         cmd,
         stdout=stdout_file,
