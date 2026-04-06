@@ -105,6 +105,7 @@ def main(
     dejavu_args: list[str],
     capture_stdout=False,
     capture_stderr=True,
+    clean_up=False,
 ) -> None:
     logout_path = output_base_path
     stdout_path = output_base_path.with_suffix(".stdout")
@@ -187,9 +188,18 @@ def main(
     except Exception:
         pass
 
-    print(f"#log at {logout_path}")
-    with open(logout_path, "w") as logout:
-        json.dump(result, logout)
+    if clean_up and result["memed_out"]:
+        if capture_stdout:
+            stdout_path.unlink()
+        if capture_stderr:
+            stderr_path.unlink()
+
+        logout_path.unlink()
+
+    else:
+        print(f"#log at {logout_path}")
+        with open(logout_path, "w") as logout:
+            json.dump(result, logout)
 
     # Exit with the child's code when possible, else 1
     sys.exit(proc.returncode if proc.returncode >= 0 else 1)
@@ -209,6 +219,7 @@ if __name__ == "__main__":
     p.add_argument("-o", "--output", type=Path, required=True, help="Output directory")
     p.add_argument("-t", "--timeout", type=float, default=120, help="Timeout in sec")
     p.add_argument("-m", "--memory", type=float, default=10.0, help="Mem lim in GB")
+    p.add_argument("-c", "--clean", action="store_true", help="Clean output if mem out")
     p.add_argument("child_args", nargs=argparse.REMAINDER)
 
     args = p.parse_args()
@@ -238,4 +249,5 @@ if __name__ == "__main__":
         timeout=args.timeout,
         memory_out_gb=args.memory,
         dejavu_args=child_args,
+        clean_up=args.clean,
     )
