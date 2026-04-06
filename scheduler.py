@@ -93,7 +93,7 @@ if __name__ == "__main__":
     p.add_argument("-m", "--mem", type=float, default=1.0, help="Init Mem lim in GB")
     p.add_argument("-M", "--mem-max", type=float, help="Max mem limit in GB")
     p.add_argument("-j", "--jobs", type=int, help="Number of parallel jobs")
-    p.add_argument("-l", "--label", type=str, default="run", help="Label for jobs")
+    p.add_argument("-l", "--label", type=str, help="Label for jobs")
     p.add_argument("child_args", nargs=argparse.REMAINDER)
 
     args = p.parse_args()
@@ -103,11 +103,16 @@ if __name__ == "__main__":
     instances = load_instances(args.instances)
     print(f"Found {len(instances)} instances")
 
+    if args.label is None:
+        label = args.instances.stem + "_".join(args.child_args)
+    else:
+        label = args.label
+
     timestamp = str(datetime.datetime.now()).replace("-", "").replace(":", "")
     dirname = re.sub(
         r"[^\w\d\-\.]",
         "_",
-        timestamp + "_" + args.label,
+        timestamp + "_" + label,
     )
     output_dir = args.output / dirname
     output_dir.mkdir(parents=True, exist_ok=True)
