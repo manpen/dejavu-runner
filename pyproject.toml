@@ -3,4 +3,11 @@ name = "dejavu-runner"
 version = "0.1.0"
 description = "Tools to execute dejavu"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+    "ipykernel>=7.2.0",
+    "jupyter>=1.1.1",
+    "jupyter-client>=8.7.0",
+    "matplotlib>=3.10.8",
+    "notebook>=7.4.9",
+    "seaborn>=0.13.2",
+]

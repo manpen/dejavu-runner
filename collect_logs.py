@@ -18,9 +18,10 @@ if __name__ == "__main__":
     # compute output fir
     output = args.output_dir
     if output is None:
-        output = args.input_dir / "collected.json"
+        print("Input: ", args.input_dir)
+        output = Path(str(args.input_dir) + ".json")
 
-    log_files = list(args.input_dir.rglob("*.log"))
+    log_files = list(args.input_dir.rglob("*.json"))
     print(f"Found {len(log_files)} log files")
 
     logs = []
@@ -29,13 +30,15 @@ if __name__ == "__main__":
             with open(log_file, "r") as f:
                 log = json.load(f)
 
-            dejavu_log = load_dejavu_log(log["outputs"]["stderr"])
+            dejavu_log = load_dejavu_log(log_file.with_suffix(".stderr"))
         except Exception as e:
             print(f"Skip file {log_file} due to error: {e}")
             continue
 
         if dejavu_log is None or "solve_time" not in dejavu_log:
             print(f"Incomplete run {log_file}")
+            continue
+
         else:
             log["exec"] = dejavu_log
 

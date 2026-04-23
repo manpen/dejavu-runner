@@ -11,16 +11,15 @@ def load_dejavu_log(path: Path):
     PARSE_TIME = re.compile(
         r"c parse_time=(\d+\.?\d*)ms, file_size=(\d+\.?\d*)mb, n=(\d+), m=(\d+)"
     )
-    num = r"\s+(\d+\.?\d*)"
+    num = r"\s+(\d+\.?\d*|inf|-?nan)"
     PREPROC_LINE = re.compile("c" + num + r"\s+(\w+)" + (num * 10) + "%")
     TIME_LINE = re.compile(f"c{num}ms{num}%\\s(\\w+)")
     FINAL_LINE = re.compile(r"c solve_time=(\d+\.?\d*)ms")
 
-    result = {"preproc": {}, "times": {}}
+    result = {"preproc": {}, "preproc_rows": [],  "times": {}}
 
     stage = 0
 
-    last_preproc_row = None
     with open(path) as f:
         for line in f:
             line = strip_ansi(line).strip()
@@ -55,7 +54,7 @@ def load_dejavu_log(path: Path):
                     "position": len(result["preproc"]),
                 }
                 result["preproc"][m.group(2)] = row
-                last_preproc_row = row
+                result["preproc_rows"].append(row)
 
                 continue
 
@@ -75,9 +74,9 @@ def load_dejavu_log(path: Path):
                 stage = 1000
                 result["solve_time"] = float(m.group(1))
 
-    if last_preproc_row is not None:
-        result["final_n"] = last_preproc_row["n"]
-        result["final_m"] = last_preproc_row["m"]
+    if len(result["preproc_rows"]) > 0:
+        result["final_n"] = result["preproc_rows"][-1]["n"]
+        result["final_m"] = result["preproc_rows"][-1]["m"]
 
     return result
 
